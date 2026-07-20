@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#08111a" />
+  <title>迷宮脱出 - NIGHT RUN</title>
+  <style>
+    :root { color-scheme: dark; --ink:#edf7ff; --muted:#9ab0bd; --panel:#101d28; --line:#2b4655; --cyan:#57e5dc; --danger:#ff627e; --gold:#ffd86b; }
+    * { box-sizing:border-box; } body { margin:0; min-height:100vh; color:var(--ink); font-family:ui-rounded,"Hiragino Maru Gothic ProN","Noto Sans JP",sans-serif; background:radial-gradient(circle at 50% -20%,#1c4550 0,#09131c 43%,#05090e 100%); }
+    main { width:min(960px,calc(100% - 28px)); margin:auto; padding:22px 0 30px; }
+    header { display:flex; align-items:end; justify-content:space-between; gap:15px; margin-bottom:15px; } h1 { margin:0; font-size:clamp(1.45rem,5vw,2.3rem); letter-spacing:.1em; } h1 span { color:var(--cyan); } header p { margin:0; color:var(--muted); font-size:.82rem; text-align:right; }
+    .game { display:grid; grid-template-columns:minmax(0,1fr) 245px; gap:16px; } .maze-wrap { position:relative; background:#071018; border:1px solid var(--line); border-radius:20px; padding:12px; box-shadow:0 20px 60px #0008; }
+    canvas { width:100%; display:block; aspect-ratio:1; border-radius:10px; image-rendering:pixelated; background:#0b1921; } .status { position:absolute; inset:24px; display:grid; place-items:center; pointer-events:none; text-align:center; opacity:0; transition:.2s; } .status.show { opacity:1; background:#071018d9; } .status h2 { margin:0; font-size:clamp(1.7rem,7vw,3.2rem); letter-spacing:.08em; } .status p { color:var(--muted); margin:10px 0; }
+    aside { display:grid; align-content:start; gap:12px; } .panel { background:linear-gradient(145deg,#142632,#0d1821); border:1px solid var(--line); border-radius:16px; padding:15px; } .label { font-size:.73rem; letter-spacing:.12em; color:var(--muted); } .meter { height:12px; overflow:hidden; background:#050a0e; border-radius:99px; margin-top:8px; border:1px solid #29404c; } .meter i { display:block; width:100%; height:100%; border-radius:inherit; background:linear-gradient(90deg,#48d9cf,#a1ffe1); transition:width .15s; } #timeBar { background:linear-gradient(90deg,#ffd86b,#ff8c64); } .num { display:flex; justify-content:space-between; margin-top:6px; font-size:.85rem; } .item { display:flex; align-items:center; gap:9px; margin:8px 0 0; color:#dbeaf0; font-size:.84rem; } .legend { display:grid; gap:8px; } .dot { display:inline-grid; place-items:center; width:21px; height:21px; border-radius:6px; margin-right:6px; font-size:.8rem; } .player{background:#57e5dc;color:#071018}.enemy{background:#ff627e}.exit{background:#ffd86b;color:#312600}.energy{background:#9f8cff}.dash{background:#ffa868}
+    button { cursor:pointer; font:inherit; border:1px solid #3c6571; color:var(--ink); background:#15323c; border-radius:12px; padding:11px; transition:.15s; } button:hover { background:#1e4954; transform:translateY(-2px); } #newGame { width:100%; color:#082026; background:var(--cyan); border:0; font-weight:800; }
+    .controls { display:none; grid-template-columns:repeat(3,58px); justify-content:center; gap:5px; margin:18px auto 0; } .controls button { padding:8px; font-size:1.25rem; } .controls .up { grid-column:2; } .controls .left { grid-column:1; grid-row:2; } .controls .down { grid-column:2; grid-row:2; } .controls .right { grid-column:3; grid-row:2; }
+    .tips { margin:16px 0 0; text-align:center; font-size:.8rem; color:var(--muted); } kbd { border:1px solid #49616c; padding:2px 5px; border-radius:4px; color:var(--ink); }
+    @media(max-width:700px) { header { align-items:start; flex-direction:column; } header p { text-align:left; } .game { grid-template-columns:1fr; } aside { grid-template-columns:1fr 1fr; } aside .panel:last-of-type { grid-column:span 2; } .controls { display:grid; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div><h1>迷宮脱出 <span>— NIGHT RUN</span></h1></div><p>出口を目指せ。赤い影に捕まるな。</p></header>
+    <div class="game">
+      <section class="maze-wrap" aria-label="迷路ゲーム">
+        <canvas id="maze" width="700" height="700"></canvas>
+        <div class="status" id="status"><div><h2 id="statusTitle"></h2><p id="statusText"></p><button id="retry">もう一度挑戦</button></div></div>
+      </section>
+      <aside>
+        <section class="panel"><div class="label">STAMINA</div><div class="meter"><i id="staminaBar"></i></div><div class="num"><span id="staminaNum">100 / 100</span><span>移動で消費</span></div></section>
+        <section class="panel"><div class="label">REMAINING TIME</div><div class="meter"><i id="timeBar"></i></div><div class="num"><span id="timer">120</span><span>SEC</span></div></section>
+        <section class="panel legend"><div class="label">SCANNER</div><div><span class="dot player">●</span>あなた　<span class="dot enemy">●</span>追跡者</div><div><span class="dot exit">↗</span>出口　<span class="dot energy">✚</span>スタミナ回復</div><div><span class="dot dash">»</span>ダッシュ補給</div></section>
+        <button id="newGame">新しい迷路を生成</button>
+      </aside>
+    </div>
+    <div class="controls" aria-label="タッチ操作"><button class="up" data-dir="up">▲</button><button class="left" data-dir="left">◀</button><button class="down" data-dir="down">▼</button><button class="right" data-dir="right">▶</button></div>
+    <p class="tips"><kbd>WASD</kbd> / <kbd>矢印</kbd> で移動　 <kbd>Shift</kbd> または <kbd>Space</kbd> でダッシュ（ダッシュ補給取得後）</p>
+  </main>
+  <script>
+    const canvas=document.querySelector('#maze'), ctx=canvas.getContext('2d');
+    const SIZE=21, dirs={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}, keyDirs={ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
+    let grid, player, enemy, exit, items, stamina, time, dash, active, last, enemyClock;
+    const rand=a=>a[Math.floor(Math.random()*a.length)], equal=(a,b)=>a.x===b.x&&a.y===b.y, cell=()=>({x:1,y:1});
+    function generate(){
+      grid=Array.from({length:SIZE},()=>Array(SIZE).fill(1)); const stack=[cell()]; grid[1][1]=0;
+      while(stack.length){ const p=stack.at(-1), choices=[]; for(const [dx,dy] of Object.values(dirs)){const x=p.x+dx*2,y=p.y+dy*2;if(x>0&&y>0&&x<SIZE-1&&y<SIZE-1&&grid[y][x]===1) choices.push({x,y,wx:p.x+dx,wy:p.y+dy});} if(!choices.length){stack.pop();continue;} const n=rand(choices); grid[n.wy][n.wx]=grid[n.y][n.x]=0;stack.push(n); }
+    }
+    function reachable(from){ const q=[from], seen=new Set([from.x+','+from.y]); while(q.length){let p=q.shift();for(const [dx,dy] of Object.values(dirs)){let n={x:p.x+dx,y:p.y+dy}, k=n.x+','+n.y;if(n.x>0&&n.x<SIZE-1&&n.y>0&&n.y<SIZE-1&&!grid[n.y][n.x]&&!seen.has(k)){seen.add(k);q.push(n)}}}return [...seen].map(k=>{let [x,y]=k.split(',').map(Number);return{x,y}}) }
+    function gameStart(){ generate(); player={x:1,y:1}; const places=reachable(player).filter(p=>p.x+p.y>SIZE); exit=rand(places); const far=places.filter(p=>Math.abs(p.x-player.x)+Math.abs(p.y-player.y)>22&&!equal(p,exit)); enemy=rand(far); const pool=far.filter(p=>!equal(p,enemy)&&!equal(p,exit)); items=[{...rand(pool),type:'energy'},{...rand(pool),type:'dash'},{...rand(pool),type:'energy'}]; stamina=100; time=120; dash=0; active=true; last=performance.now(); enemyClock=0; document.querySelector('#status').classList.remove('show'); draw(); updateHUD(); requestAnimationFrame(tick); }
+    function updateHUD(){document.querySelector('#staminaBar').style.width=stamina+'%';document.querySelector('#staminaNum').textContent=Math.ceil(stamina)+' / 100';document.querySelector('#timer').textContent=Math.ceil(time);document.querySelector('#timeBar').style.width=Math.max(0,time/120*100)+'%'}
+    function end(win, reason){active=false;document.querySelector('#statusTitle').textContent=win?'脱出成功！':'GAME OVER';document.querySelector('#statusText').textContent=win?'夜の迷宮から生還した。':reason;document.querySelector('#status').classList.add('show');draw()}
+    function stepEnemy(){ const q=[enemy], prev=new Map([[enemy.x+','+enemy.y',null]]); while(q.length){let p=q.shift();if(equal(p,player))break;for(const [dx,dy] of Object.values(dirs)){let n={x:p.x+dx,y:p.y+dy},k=n.x+','+n.y;if(n.x>=0&&n.x<SIZE&&n.y>=0&&n.y<SIZE&&!grid[n.y][n.x]&&!prev.has(k)){prev.set(k,p);q.push(n)}}} let cur=player, parent=prev.get(cur.x+','+cur.y); if(parent){while(parent&&!equal(parent,enemy)){cur=parent;parent=prev.get(cur.x+','+cur.y)} enemy=cur;} if(equal(enemy,player))end(false,'追跡者に見つかってしまった。'); }
+    function move(direction, sprint=false){ if(!active)return; const [dx,dy]=dirs[direction], steps=sprint&&dash>0&&stamina>5?2:1; let moved=false; for(let i=0;i<steps;i++){const x=player.x+dx,y=player.y+dy;if(x<0||y<0||x>=SIZE||y>=SIZE||grid[y][x])break;player={x,y};moved=true;if(equal(player,exit)){end(true);return} const hit=items.findIndex(it=>equal(it,player));if(hit>=0){const it=items.splice(hit,1)[0];if(it.type==='energy')stamina=Math.min(100,stamina+38);else dash+=3;} } if(moved){stamina=Math.max(0,stamina-(sprint?7:2));draw();updateHUD();} }
+    function tick(now){ if(!active)return; const dt=(now-last)/1000;last=now;time-=dt;stamina=Math.max(0,stamina-dt*.55);enemyClock+=dt;if(enemyClock>.72){enemyClock=0;stepEnemy()}if(time<=0)end(false,'時間切れ。迷宮に飲み込まれた。');if(stamina<=0)end(false,'スタミナ切れで動けなくなった。');updateHUD();draw();if(active)requestAnimationFrame(tick) }
+    function draw(){ const w=canvas.width/SIZE;ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#061018';ctx.fillRect(0,0,canvas.width,canvas.height);for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){if(grid[y][x]){ctx.fillStyle='#19313d';ctx.fillRect(x*w,y*w,w,w);ctx.fillStyle='#234351';ctx.fillRect(x*w+2,y*w+2,w-4,3)}}
+      const mark=(p,color,text)=>{ctx.fillStyle=color;ctx.fillRect(p.x*w+3,p.y*w+3,w-6,w-6);if(text){ctx.fillStyle='#071018';ctx.font=`bold ${w*.65}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,(p.x+.5)*w,(p.y+.53)*w)}};items.forEach(i=>mark(i,i.type==='energy'?'#9f8cff':'#ffa868',i.type==='energy'?'+':'»'));mark(exit,'#ffd86b','↗');mark(enemy,'#ff627e','');mark(player,'#57e5dc',''); }
+    document.addEventListener('keydown',e=>{const d=keyDirs[e.key];if(d){e.preventDefault();move(d,e.shiftKey||e.code==='Space')} });document.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>move(b.dataset.dir)));document.querySelector('#newGame').onclick=gameStart;document.querySelector('#retry').onclick=gameStart;gameStart();
+  </script>
+</body>
+</html>
